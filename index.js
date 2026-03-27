@@ -41,6 +41,7 @@
         this.runningTime = 0;
         this.msPerFrame = 1000 / FPS;
         this.currentSpeed = this.config.SPEED;
+        this.groundFrictionEnabled = true;
 
         this.obstacles = [];
 
@@ -123,6 +124,7 @@
         MOBILE_SPEED_COEFFICIENT: 1.2,
         RESOURCE_TEMPLATE_ID: 'audio-resources',
         SPEED: 6,
+        GROUND_FRICTION: 0.7,
         SPEED_DROP_COEFFICIENT: 3,
         ARCADE_MODE_INITIAL_TOP_POSITION: 35,
         ARCADE_MODE_TOP_POSITION_PERCENT: 0.1
@@ -206,7 +208,8 @@
     Runner.keycodes = {
         JUMP: { '38': 1, '32': 1 },  // Up, spacebar
         DUCK: { '40': 1 },  // Down
-        RESTART: { '13': 1 }  // Enter
+        RESTART: { '13': 1 },  // Enter
+        TOGGLE_FRICTION: { '70': 1 }  // F
     };
 
 
@@ -550,12 +553,20 @@
                     this.playIntro();
                 }
 
+                var worldSpeed = this.currentSpeed;
+                if (this.groundFrictionEnabled && !this.tRex.jumping &&
+                    !this.playingIntro) {
+                    // Keep at least 1px/frame equivalent movement to avoid horizon artifacts.
+                    worldSpeed = Math.max(1, this.currentSpeed *
+                        (1 - this.config.GROUND_FRICTION));
+                }
+
                 // The horizon doesn't move until the intro is over.
                 if (this.playingIntro) {
                     this.horizon.update(0, this.currentSpeed, hasObstacles);
                 } else {
                     deltaTime = !this.activated ? 0 : deltaTime;
-                    this.horizon.update(deltaTime, this.currentSpeed, hasObstacles,
+                    this.horizon.update(deltaTime, worldSpeed, hasObstacles,
                         this.inverted);
                 }
 
@@ -564,7 +575,7 @@
                     checkForCollision(this.horizon.obstacles[0], this.tRex);
 
                 if (!collision) {
-                    this.distanceRan += this.currentSpeed * deltaTime / this.msPerFrame;
+                    this.distanceRan += worldSpeed * deltaTime / this.msPerFrame;
 
                     if (this.currentSpeed < this.config.MAX_SPEED) {
                         this.currentSpeed += this.config.ACCELERATION;
@@ -675,6 +686,13 @@
             // Prevent native page scrolling whilst tapping on mobile.
             if (IS_MOBILE && this.playing) {
                 e.preventDefault();
+            }
+
+            var keyCode = String(e.keyCode);
+            if (Runner.keycodes.TOGGLE_FRICTION[keyCode] && !e.repeat) {
+                this.groundFrictionEnabled = !this.groundFrictionEnabled;
+                console.log('Ground friction:', this.groundFrictionEnabled ? 'ON' : 'OFF');
+                return;
             }
 
             if (e.target != this.detailsButton) {
